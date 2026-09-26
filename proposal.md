@@ -121,7 +121,10 @@ and hostnames are private — see /x/m/v270/suemo/, never hardcoded.
 ## Release & packaging
 
 - Tag `v*` → GitHub Actions → per-arch tarballs + `SHA256SUMS` → GitHub
-  Release. Template: `/g/mdrv-oc/.github/workflows/release.yml` (jobs:
+  Release. **Asset naming (owner preference, same as upperadd):
+  `<name>-<tag>-<rust-target-triple>.tar.gz`** — e.g.
+  `suemo-v0.1.0-aarch64-unknown-linux-gnu.tar.gz`,
+  `suemo-v0.1.0-x86_64-unknown-linux-gnu.tar.gz`. Template: `/g/mdrv-oc/.github/workflows/release.yml` (jobs:
   build matrix → artifacts → release). **Use the latest `uses:` versions**
   (owner requirement; mdrv-oc's are the floor, not the ceiling).
 - **Not musl**: gpui/wayland/wgpu on musl is uncharted; consumers are Arch.

@@ -47,6 +47,9 @@ Hard rules:
 - systemd user unit mirrors `~/.config/systemd/user/upperadd.service` in
   shape (`daemon start --foreground`, `Restart=on-failure`,
   `KillMode=process` not needed unless you spawn subprocesses).
+- Release assets are named `<name>-<tag>-<rust-target-triple>.tar.gz`
+  (owner preference; e.g. `suemo-v0.1.0-aarch64-unknown-linux-gnu.tar.gz` —
+  same convention as upperadd's release workflow).
 - Conventional commits, small and frequent; commit only with checks green.
   No new dependency without a sentence of justification in the commit body.
 
