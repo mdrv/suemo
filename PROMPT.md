@@ -9,7 +9,7 @@ Read, in order, before writing any code:
 2. `/x/m/v270/mdrv-db/01-architecture.md` + `02-engine-api.md` — the engine
    you embed (Rust crate, `TursoPort` behind the `turso` feature; SQL-only
    app surface; one `execute` = one LSN = one tx).
-3. `/x/m/v270/gpui-ce/gpui-ce.md` — the GPUI fork's practical docs (§6
+3. `/x/m/v270/gpui-ce/10-practical-api.md` — the GPUI fork's practical docs (§6
    layer-shell, §19 z-order, §28 animation-freeze). skimming §16 (IPC/wake,
    re-entrancy) is mandatory before daemon/GUI wiring.
 4. `/g/gpui-ce/MDRV.md` — fork consumption rules (git-tag deps, package
