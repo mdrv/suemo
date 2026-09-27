@@ -18,17 +18,21 @@ pub struct DaemonOpts {
     pub replica: bool,
 }
 
-enum EngineMsg {
+pub(crate) enum EngineMsg {
     Serve {
         request: Request,
         reply: mpsc::SyncSender<std::result::Result<Reply, String>>,
+    },
+    /// Replica only: a staged backup to verify and swap in.
+    Restore {
+        staging: std::path::PathBuf,
     },
     Stop,
 }
 
 /// Engine reply: the per-request response plus the LSN to broadcast.
-struct Reply {
-    response: Response,
+pub(crate) struct Reply {
+    pub(crate) response: Response,
     changed: Option<i64>,
 }
 
@@ -54,15 +58,33 @@ pub fn run(opts: DaemonOpts) -> Result<()> {
     std::fs::set_permissions(&sock, std::fs::Permissions::from_mode(0o600))?;
     log::info!("listening on {}", sock.display());
 
-    if opts.replica {
-        // M4: restore-watcher + REST/SSE; socket IPC stays available.
-        log::warn!("--replica: restore + REST/SSE land in M4; running socket-only");
-    }
-
     let started_utc = domain::now_ms();
     let bus: Arc<Bus> = Arc::new(Bus::default());
     let (tx, rx) = mpsc::channel::<EngineMsg>();
     let replica = opts.replica;
+    if replica {
+        let addr =
+            std::env::var("SUEMO_HTTP_ADDR").unwrap_or_else(|_| "127.0.0.1:8917".to_string());
+        let token = std::env::var("SUEMO_HTTP_TOKEN")
+            .ok()
+            .filter(|t| !t.is_empty());
+        let incoming = std::env::var("SUEMO_REPLICA_IN")
+            .ok()
+            .filter(|s| !s.is_empty());
+        crate::http::serve(
+            crate::http::HttpOpts { addr, token },
+            tx.clone(),
+            Arc::clone(&bus),
+        )?;
+        match incoming {
+            Some(dir) => {
+                crate::sync::watch_incoming(dir.into(), crate::engine::default_root(), tx.clone())
+            }
+            None => log::warn!(
+                "--replica: SUEMO_REPLICA_IN unset — serving HTTP without restore-watching"
+            ),
+        }
+    }
     let engine_bus = Arc::clone(&bus);
     let engine_thread =
         std::thread::spawn(move || engine_loop(rx, engine_bus, replica, started_utc));
@@ -71,20 +93,21 @@ pub fn run(opts: DaemonOpts) -> Result<()> {
     Ok(())
 }
 
-/// Change broadcast: watchers get `{"changed":<lsn>}` lines (Q3).
+/// Change broadcast: watchers get `{"changed":<lsn>}` lines (Q3); the
+/// replica's SSE stream subscribes to the same bus.
 #[derive(Default)]
-struct Bus {
+pub(crate) struct Bus {
     watchers: Mutex<Vec<mpsc::Sender<i64>>>,
 }
 
 impl Bus {
-    fn subscribe(&self) -> mpsc::Receiver<i64> {
+    pub(crate) fn subscribe(&self) -> mpsc::Receiver<i64> {
         let (tx, rx) = mpsc::channel();
         self.watchers.lock().unwrap().push(tx);
         rx
     }
 
-    fn publish(&self, lsn: i64) {
+    pub(crate) fn publish(&self, lsn: i64) {
         let mut watchers = self.watchers.lock().unwrap();
         watchers.retain(|w| w.send(lsn).is_ok());
     }
@@ -201,22 +224,45 @@ fn write_line<T: Serialize>(stream: &mut UnixStream, value: &T) -> std::io::Resu
 
 fn engine_loop(rx: mpsc::Receiver<EngineMsg>, bus: Arc<Bus>, replica: bool, started_utc: i64) {
     let root = crate::engine::default_root();
-    let db = match Db::open(&root) {
-        Ok(db) => db,
-        Err(err) => {
-            log::error!("opening engine at {}: {err:#}", root.display());
-            eprintln!(
-                "suemo daemon: opening engine at {}: {err:#}",
-                root.display()
-            );
-            std::process::exit(1);
-        }
-    };
+    let mut db: Option<Db> = Some(open_or_die(&root));
     log::info!("engine open at {} (replica: {replica})", root.display());
-    while let Ok(msg) = rx.recv() {
+    // Proposal §Sync 1: debounced-on-change + hourly recovery backups.
+    let mut backups = crate::sync::BackupState::new(started_utc);
+    loop {
+        let msg = match rx.recv_timeout(std::time::Duration::from_secs(1)) {
+            Ok(msg) => msg,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if let Some(db) = db.as_ref() {
+                    backups.tick(domain::now_ms(), db, &root);
+                }
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        };
         match msg {
             EngineMsg::Serve { request, reply } => {
-                let _ = reply.send(handle(&db, &request, replica, started_utc));
+                let result = handle(
+                    db.as_ref().expect("engine present on serve path"),
+                    &request,
+                    replica,
+                    started_utc,
+                );
+                if matches!(&result, Ok(reply) if reply.changed.is_some()) {
+                    backups.on_change(domain::now_ms());
+                }
+                let _ = reply.send(result);
+            }
+            EngineMsg::Restore { staging } => {
+                match crate::sync::adopt(db.take(), &root, &staging) {
+                    Ok((new_db, applied)) => {
+                        db = Some(new_db);
+                        bus.publish(applied);
+                    }
+                    Err(err) => {
+                        log::error!("adopting {}: {err:#}", staging.display());
+                        db = Some(open_or_die(&root));
+                    }
+                }
             }
             EngineMsg::Stop => break,
         }
@@ -228,6 +274,20 @@ fn engine_loop(rx: mpsc::Receiver<EngineMsg>, bus: Arc<Bus>, replica: bool, star
     let _ = std::fs::remove_file(ipc::socket_path());
     log::info!("engine closed, socket removed, exiting");
     std::process::exit(0);
+}
+
+fn open_or_die(root: &std::path::Path) -> Db {
+    match Db::open(root) {
+        Ok(db) => db,
+        Err(err) => {
+            log::error!("opening engine at {}: {err:#}", root.display());
+            eprintln!(
+                "suemo daemon: opening engine at {}: {err:#}",
+                root.display()
+            );
+            std::process::exit(1);
+        }
+    }
 }
 
 fn handle(

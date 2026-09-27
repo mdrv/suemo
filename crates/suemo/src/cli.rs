@@ -24,7 +24,9 @@ pub enum Cmd {
         /// foreground (detaching is the spawner's job; accepted for clarity)
         #[arg(long)]
         foreground: bool,
-        /// VPS replica mode: ingest pushed backups, serve REST+SSE (M4)
+        /// VPS replica mode: serve the read-only HTTP API on
+        /// SUEMO_HTTP_ADDR (default 127.0.0.1:8917, bearer token via
+        /// SUEMO_HTTP_TOKEN) and adopt pushed backups from SUEMO_REPLICA_IN
         #[arg(long)]
         replica: bool,
     },

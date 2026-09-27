@@ -185,6 +185,21 @@ impl Db {
             .unwrap_or(0))
     }
 
+    /// Recovery backup into `dest` (proposal §Sync: `<ts>-daemon` under the
+    /// root's `recovery/`). Persists the envelope, snapshots turso, copies
+    /// fjall + blobs, writes `manifest.json` last (the completeness marker).
+    pub fn backup(&self, dest: &Path) -> Result<()> {
+        mdrv_db::backup::run(&self.engine, dest)
+            .map(|_| ())
+            .map_err(|e| anyhow!("backup: {e}"))
+    }
+
+    /// Envelope integrity check on the open engine (proposal §Sync:
+    /// "verify-ok required" after each backup).
+    pub fn verify(&self) -> Result<Value> {
+        mdrv_db::verify::run(&self.engine).map_err(|e| anyhow!("verify: {e}"))
+    }
+
     fn select(&self, sql: &str, params: Vec<PortValue>) -> Result<Vec<Value>> {
         let out = self.engine.query(sql, params).map_err(|e| anyhow!("{e}"))?;
         Ok(out.as_array().cloned().unwrap_or_default())
