@@ -28,20 +28,24 @@ suemo.service (systemd --user)          suemo daemon — owns the engine 24/7
   ├─ REST + SSE (loopback + LAN): /api/events, /api/stats, /api/stream
   └─ sync: scheduled offline backup → push to VPS replica (one-way)
 
-suemo gui (GPUI full-window client)     suemo add/today/week (CLI clients)
+suemo toggle (GPUI overlay client)      suemo add/today/week (CLI clients)
 VPS: suemo daemon --replica             ingests pushed backups, serves REST+SSE
                                         web app (Svelte) + Android (Capacitor) = v0.2
 ```
 
 - **Single binary** `suemo` (clap): `daemon [--foreground] [--replica]`,
-  `gui`, `add <title> [HH:MM|now] [HH:MM|+90m] [--kind k]`, `today`,
+  `toggle`, `add <title> [HH:MM|now] [HH:MM|+90m] [--kind k]`, `today`,
   `week`, `status`, `stop`. No `suemod` — the daemon is a subcommand.
 - The daemon owning the engine (not the GUI) is what makes quick-add from a
   terminal work while the GUI is open, and what keeps sync + the VPS replica
   alive when the GUI is closed.
-- GUI = full-window app (NOT an overlay). Day view is the landing view; Week
-  view second. The upperadd-style layer-shell quick-add popup is a v0.2 idea
-  and must NOT shape v0.1 architecture.
+- GUI = summoned fullscreen layer-shell overlay (grill round 5): `suemo
+  toggle` shows/hides, Esc hides while shown, `Layer::Overlay` + translucent
+  backdrop, keyboard Exclusive while shown. The toggle is a short-lived
+  process (spawn/exit) because the fork cannot hide/show windows at runtime
+  (gpui-ce §27). Day view is the landing view; Week view second. The
+  upperadd-style quick-add popup is a v0.2 idea and must NOT shape v0.1
+  architecture.
 
 ## Data model (mdrv-db)
 

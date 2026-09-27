@@ -47,3 +47,23 @@ Also settled by this round:
   `Restart=on-failure`.
 - **`suemo add` default kind**: `general` when `--kind` is omitted (a real
   bucket in the stats strip, not an empty string).
+
+## Grill round 5 — 2026-09-27: GUI becomes a summoned fullscreen overlay
+
+Owner direction: "not another window; layer-shell with transparency, full
+screen, immersive." Decisions:
+
+1. **Summoned, not ambient** (Q1/Q2/Q3): `suemo toggle` shows a fullscreen
+   transparent overlay or hides it; while shown it takes the keyboard
+   (`KeyboardInteractivity::Exclusive` — Esc hides, focus returns on hide).
+2. **Layer::Overlay** (Q4): visible even over fullscreen apps (§19).
+3. **Toggle = process spawn/exit** (Q5 + owner: erase `suemo gui`): the
+   fork cannot hide/show or destroy its last window at runtime (§16, §27),
+   so the overlay is a short-lived process. `toggle` probes `gui.sock`:
+   answering → send `stop` : spawn self detached with the hidden `overlay`
+   verb. `gui` is no longer a verb. The engine daemon is untouched and
+   stays headless.
+4. Layout: centered ~880px column over a translucent backdrop (α 0.92);
+   other layouts deferred.
+
+Hyprland bind (owner-side): `bind = <mod>, S, exec, suemo toggle`.
