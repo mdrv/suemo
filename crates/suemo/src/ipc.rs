@@ -80,7 +80,8 @@ pub struct DaemonStatus {
 }
 
 /// Broadcast notification: a hint, not data — clients refetch (Q3/Q5).
-#[derive(Debug, Serialize)]
+/// The daemon serializes it; the GUI deserializes it.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Changed {
     pub changed: i64,
 }
@@ -163,4 +164,15 @@ pub fn open_watch() -> Result<BufReader<UnixStream>> {
         Response::Err { message } => Err(anyhow!("watch rejected: {message}")),
         _ => Err(anyhow!("unexpected reply to watch")),
     }
+}
+
+/// Next change hint from a watch stream; `None` on clean EOF (the daemon
+/// closes watch streams when it stops).
+pub fn read_changed(reader: &mut BufReader<UnixStream>) -> Result<Option<i64>> {
+    let mut line = String::new();
+    if reader.read_line(&mut line)? == 0 {
+        return Ok(None);
+    }
+    let changed: Changed = serde_json::from_str(line.trim())?;
+    Ok(Some(changed.changed))
 }
