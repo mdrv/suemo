@@ -10,15 +10,20 @@ mod editor;
 mod schedule;
 mod theme;
 
-use std::io::{BufRead, BufReader};
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::UnixListener;
-
-use anyhow::{Context as _, Result, bail};
+use anyhow::Result;
+#[cfg(unix)]
+use anyhow::{Context as _, bail};
 use futures::{
     StreamExt,
     channel::mpsc::{self, UnboundedSender},
 };
+#[cfg(unix)]
+use std::io::{BufRead, BufReader};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use std::os::unix::net::UnixListener;
+
 use gpui::{
     App, AppContext, Bounds, Focusable as _, KeyBinding, WindowBackgroundAppearance, WindowBounds,
     WindowKind, WindowOptions,
@@ -32,7 +37,9 @@ use crate::schedule::{Quit, ScheduleView};
 
 /// Single-overlay lock (decisions.md Q8): binding `gui.sock` fails while an
 /// overlay process is alive; a leftover file from a crash is probed and
-/// removed. Doubles as the `suemo toggle` control socket.
+/// removed. Doubles as the `suemo toggle` control socket. (Unix only —
+/// Windows is a compile-check target, proposal §Platforms.)
+#[cfg(unix)]
 fn gui_lock() -> Result<UnixListener> {
     let path = ipc::gui_socket_path();
     let dir = path
@@ -53,6 +60,7 @@ fn gui_lock() -> Result<UnixListener> {
 
 /// Control-socket thread: one line per connection; `stop` quits the
 /// overlay (§27 pattern — the UI side only sees a channel message).
+#[cfg(unix)]
 fn spawn_control_thread(listener: UnixListener, stop_tx: UnboundedSender<()>) {
     std::thread::spawn(move || {
         for stream in listener.incoming() {
@@ -72,15 +80,23 @@ fn spawn_control_thread(listener: UnixListener, stop_tx: UnboundedSender<()>) {
 }
 
 pub fn run() -> Result<()> {
-    let listener = gui_lock()?;
+    // Lock + control socket are unix-only; elsewhere the channel simply
+    // never fires (Windows is a compile-check target, proposal §Platforms).
+    #[cfg(unix)]
+    let mut stop_rx = {
+        let listener = gui_lock()?;
+        let (stop_tx, rx) = mpsc::unbounded::<()>();
+        spawn_control_thread(listener, stop_tx);
+        rx
+    };
+    #[cfg(not(unix))]
+    let mut stop_rx = mpsc::unbounded::<()>().1;
+
     // Surface config errors before any window exists.
     let _config = config::load()?;
     // The overlay is a plain socket client; it auto-starts the daemon like
     // any other verb (decisions.md Q8).
     ipc::ensure_daemon()?;
-
-    let (stop_tx, mut stop_rx) = mpsc::unbounded::<()>();
-    spawn_control_thread(listener, stop_tx);
 
     application().run(|cx: &mut App| {
         cx.bind_keys([KeyBinding::new("escape", Quit, None)]);

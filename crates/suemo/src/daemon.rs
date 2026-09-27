@@ -1,11 +1,15 @@
 //! The daemon owns the engine 24/7 (proposal §Architecture): unix-socket
 //! IPC for CLI/GUI clients + a change broadcast bus (M4's SSE shares it).
 
-use std::io::{BufRead, BufReader, Write};
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
+
+#[cfg(unix)]
+use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use std::os::unix::net::{UnixListener, UnixStream};
 
 use anyhow::{Context, Result, bail};
 use serde::Serialize;
@@ -36,6 +40,10 @@ pub(crate) struct Reply {
     changed: Option<i64>,
 }
 
+/// Socket server (unix): bind, chmod, serve connections until Stop.
+/// Windows is a compile-check target (proposal §Platforms) — the socket
+/// transport is unix-only by design.
+#[cfg(unix)]
 pub fn run(opts: DaemonOpts) -> Result<()> {
     let sock = ipc::socket_path();
     let runtime_dir = sock
@@ -113,6 +121,12 @@ impl Bus {
     }
 }
 
+#[cfg(not(unix))]
+pub fn run(_opts: DaemonOpts) -> Result<()> {
+    bail!("suemo daemon requires a unix socket (Windows is compile-check only)")
+}
+
+#[cfg(unix)]
 fn accept_loop(listener: UnixListener, tx: mpsc::Sender<EngineMsg>, bus: Arc<Bus>) {
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
@@ -126,6 +140,7 @@ fn accept_loop(listener: UnixListener, tx: mpsc::Sender<EngineMsg>, bus: Arc<Bus
     }
 }
 
+#[cfg(unix)]
 fn serve_conn(
     stream: UnixStream,
     tx: mpsc::Sender<EngineMsg>,
@@ -208,6 +223,7 @@ fn serve_conn(
     }
 }
 
+#[cfg(unix)]
 fn write_response(stream: &mut UnixStream, response: &Response) -> std::io::Result<()> {
     let line = serde_json::to_string(response).expect("response serializes");
     stream.write_all(line.as_bytes())?;
@@ -215,6 +231,7 @@ fn write_response(stream: &mut UnixStream, response: &Response) -> std::io::Resu
     stream.flush()
 }
 
+#[cfg(unix)]
 fn write_line<T: Serialize>(stream: &mut UnixStream, value: &T) -> std::io::Result<()> {
     let line = serde_json::to_string(value).expect("notification serializes");
     stream.write_all(line.as_bytes())?;
