@@ -27,9 +27,12 @@ const GRID_H: f32 = 24.0 * HOUR_PX;
 /// Hour-label gutter on the left of the grid.
 const LABEL_W: f32 = 56.0;
 const HEADER_H: f32 = 48.0;
+/// Immersive centered column (round 5; other layouts come later).
+const COLUMN_W: f32 = 880.0;
 
-// Dark theme (decisions.md Q2). Hues are turns (0..1).
-const BG: fn() -> gpui::Hsla = || hsla(0.0, 0.0, 0.07, 1.0);
+// Dark theme (decisions.md Q2); translucent backdrop — the desktop ghosts
+// through around the column (grill round 5). Hues are turns (0..1).
+const BG: fn() -> gpui::Hsla = || hsla(0.0, 0.0, 0.07, 0.92);
 
 fn text_primary() -> gpui::Hsla {
     hsla(0.0, 0.0, 0.88, 1.0)
@@ -261,39 +264,50 @@ impl Render for DayView {
                 .into_any_element(),
         );
 
-        div()
-            .size_full()
-            .flex()
-            .flex_col()
-            .bg(BG())
-            .child(
-                div()
-                    .h(px(HEADER_H))
-                    .px(px(16.))
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .child(
-                        div()
-                            .text_lg()
-                            .text_color(text_primary())
-                            .child(SharedString::from(day_label)),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(text_dim())
-                            .child(SharedString::from(count_label)),
-                    ),
-            )
-            .child(
-                div()
-                    .id("day")
-                    .flex_1()
-                    .track_scroll(&self.scroll)
-                    .overflow_y_scroll()
-                    .child(div().relative().w_full().h(px(GRID_H)).children(layers)),
-            )
+        div().size_full().flex().flex_col().bg(BG()).child(
+            div()
+                .mx_auto()
+                .h_full()
+                .w_full()
+                .max_w(px(COLUMN_W))
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .h(px(HEADER_H))
+                        .px(px(16.))
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .child(
+                            div()
+                                .text_lg()
+                                .text_color(text_primary())
+                                .child(SharedString::from(day_label)),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_3()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(text_dim())
+                                        .child(SharedString::from(count_label)),
+                                )
+                                .child(div().text_xs().text_color(text_dim()).child("esc hides")),
+                        ),
+                )
+                .child(
+                    div()
+                        .id("day")
+                        .flex_1()
+                        .track_scroll(&self.scroll)
+                        .overflow_y_scroll()
+                        .child(div().relative().w_full().h(px(GRID_H)).children(layers)),
+                ),
+        )
     }
 }
 

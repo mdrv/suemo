@@ -1,5 +1,5 @@
-//! CLI verbs: daemon, add, today, week, status, stop. (`gui` is dispatched
-//! by the binary in suemo-gpui — see that crate.)
+//! CLI verbs: daemon, add, today, week, status, stop, toggle. (`overlay`
+//! is the hidden GUI-process verb — dispatched by the binary in suemo-gpui.)
 
 use std::collections::BTreeMap;
 
@@ -28,8 +28,11 @@ pub enum Cmd {
         #[arg(long)]
         replica: bool,
     },
-    /// Open the day view (full-window GPUI client)
-    Gui,
+    /// Show the day-view overlay, or hide it if it is already shown
+    Toggle,
+    /// Run the overlay process itself (spawned detached by `toggle`)
+    #[command(hide = true)]
+    Overlay,
     /// Add an event: suemo add "Title" [HH:MM|now] [HH:MM|+90m] [--kind k]
     Add {
         title: String,
@@ -51,8 +54,9 @@ pub enum Cmd {
 pub fn run(cli: Cli) -> Result<()> {
     match cli.cmd {
         Cmd::Daemon { replica, .. } => crate::daemon::run(crate::daemon::DaemonOpts { replica }),
-        // Reached only if a front-end forgets to intercept `gui`.
-        Cmd::Gui => bail!("suemo gui is wired by the suemo-gpui front-end"),
+        // Reached only if a front-end forgets to intercept `overlay`.
+        Cmd::Overlay => bail!("suemo overlay is wired by the suemo-gpui front-end"),
+        Cmd::Toggle => toggle(),
         Cmd::Add {
             title,
             start,
@@ -144,6 +148,18 @@ fn week() -> Result<()> {
         for KindHours { kind, hours } in &stats {
             println!("  {kind:<12} {hours:.1}");
         }
+    }
+    Ok(())
+}
+
+/// `suemo toggle` — show the overlay, or hide a running one (round 5).
+fn toggle() -> Result<()> {
+    if ipc::gui_running() {
+        ipc::gui_stop();
+        println!("suemo hidden");
+    } else {
+        ipc::spawn_gui_detached()?;
+        println!("suemo shown");
     }
     Ok(())
 }
