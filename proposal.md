@@ -169,15 +169,19 @@ suemo stop && mdrv-db verify /x/db/suemo                  # schema gates
 
 Never hand-edit `/x/db/suemo/live/`; every write through the engine.
 
-## OPEN items (grill the owner — do not decide silently)
+## OPEN items → decided (grill round 4, 2026-09-27)
 
-1. Editing UX in Day/Week views: click-to-create vs drag-to-create first;
-   how inline time-editing works (handles? dialog?).
-2. Color palette (fixed list? saturation/lightness targets?).
-3. GUI live-update mechanism (socket broadcast vs loopback SSE).
-4. Stats presentation beyond the week-header strip.
-5. REST details beyond the contract (pagination? SSE payloads? PATCH
-   semantics for "move by 15 min").
-6. Caddy site config on the VPS: who writes it, which ports the replica
-   binds (deploy is owner-supervised).
-7. Concurrency rules for `add` while GUI holds an editing session.
+All seven OPEN items were grilled and answered; the decisions live in
+[decisions.md](decisions.md). One-line summary:
+
+1. Editing UX: full direct manipulation (drag-create, drag-move,
+   edge-resize, click-editor); snap 5/10/15 min via config.toml, default 5.
+2. Dark theme; kind color = hash → 16 hue buckets (S=0.5, L=0.6) + WCAG
+   `contrast_text`.
+3. Live updates via daemon socket broadcast; SSE shares the same bus.
+4. Stats = week-header strip + `suemo week` table, nothing more in v0.1.
+5. REST v0.1 is read-only (range/stats/stream, hint payloads, token beyond
+   loopback); writes = socket IPC only until v0.2.
+6. Replica binds 127.0.0.1:8917 default (`SUEMO_HTTP_ADDR`); we draft the
+   caddy/unit/env files privately, owner deploys.
+7. Last-write-wins + broadcast-reload; no version checks in v0.1.
