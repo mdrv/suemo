@@ -88,6 +88,25 @@ pub fn this_week_window() -> (i64, i64) {
     week_window(Local::now())
 }
 
+/// `[from, to)` epoch-ms of local midnight→midnight for `day` — the grid
+/// renderer's per-day windows.
+pub fn day_bounds(day: NaiveDate) -> (i64, i64) {
+    (
+        local_midnight(Local, day),
+        local_midnight(Local, day + Duration::days(1)),
+    )
+}
+
+/// `[from, to)` of the local week containing the instant `ms`.
+pub fn week_window_at(ms: i64) -> (i64, i64) {
+    week_window(
+        Local
+            .timestamp_millis_opt(ms)
+            .single()
+            .expect("valid local timestamp"),
+    )
+}
+
 fn local_midnight<Tz: TimeZone>(tz: Tz, day: NaiveDate) -> i64 {
     let naive = day.and_hms_opt(0, 0, 0).expect("midnight is representable");
     match tz.from_local_datetime(&naive) {
@@ -102,14 +121,11 @@ fn local_midnight<Tz: TimeZone>(tz: Tz, day: NaiveDate) -> i64 {
     }
 }
 
-/// Start spec: `HH:MM` (today, local) or `now`.
-pub fn parse_start(spec: &str) -> Result<i64> {
-    if spec == "now" {
-        return Ok(now_ms());
-    }
+/// `HH:MM` on the given local date → epoch-ms (DST-safe). The editor uses
+/// this to place times on the event's own day, not today.
+pub fn local_time_on(day: NaiveDate, spec: &str) -> Result<i64> {
     let (h, m) = parse_hh_mm(spec)?;
-    let today = Local::now().date_naive();
-    let naive = today.and_hms_opt(h, m, 0).context("invalid time")?;
+    let naive = day.and_hms_opt(h, m, 0).context("invalid time")?;
     Ok(Local
         .from_local_datetime(&naive)
         .earliest()
@@ -117,12 +133,49 @@ pub fn parse_start(spec: &str) -> Result<i64> {
         .timestamp_millis())
 }
 
-/// End spec: `HH:MM` (today) or `+90m`/`+2h`/`+1h30m` offset from `base`.
-pub fn parse_end(spec: &str, base: i64) -> Result<i64> {
+/// Start spec: `HH:MM` (today, local) or `now`.
+pub fn parse_start(spec: &str) -> Result<i64> {
+    if spec == "now" {
+        return Ok(now_ms());
+    }
+    local_time_on(Local::now().date_naive(), spec)
+}
+
+/// End spec on an explicit day: `HH:MM` (that day) or a `+90m` offset from
+/// `base`.
+pub fn parse_end_on(day: NaiveDate, spec: &str, base: i64) -> Result<i64> {
     match spec.strip_prefix('+') {
         Some(offset) => Ok(base + parse_offset(offset)?.num_milliseconds()),
-        None => parse_start(spec),
+        None => local_time_on(day, spec),
     }
+}
+
+/// End spec: `HH:MM` (today) or `+90m`/`+2h`/`+1h30m` offset from `base`.
+pub fn parse_end(spec: &str, base: i64) -> Result<i64> {
+    parse_end_on(Local::now().date_naive(), spec, base)
+}
+
+/// `HH:MM` in the system timezone — the shared grid/CLI line format.
+pub fn local_hm(ms: i64) -> String {
+    Local
+        .timestamp_millis_opt(ms)
+        .single()
+        .expect("valid local timestamp")
+        .format("%H:%M")
+        .to_string()
+}
+
+/// Snap `ms` to the nearest `step_minutes` grid anchored at local midnight
+/// of the day containing `ms` — drag/create gestures (decisions.md Q1).
+pub fn snap_to_step(ms: i64, step_minutes: i64) -> i64 {
+    let at = Local
+        .timestamp_millis_opt(ms)
+        .single()
+        .expect("valid local timestamp");
+    let day = day_window(at);
+    let step = step_minutes * 60_000;
+    let off = ms - day.0;
+    day.0 + (off + step / 2) / step * step
 }
 
 fn parse_hh_mm(spec: &str) -> Result<(u32, u32)> {
@@ -307,5 +360,29 @@ mod tests {
         let black_bg = [0.0, 0.0, 0.0, 1.0];
         assert_eq!(contrast_text(white_bg), [0.0, 0.0, 0.0, 1.0]); // black on white
         assert_eq!(contrast_text(black_bg), [0.0, 0.0, 1.0, 1.0]); // white on black
+    }
+
+    #[test]
+    fn local_time_and_end_parse_on_explicit_day() {
+        let day = NaiveDate::from_ymd_opt(2026, 9, 23).unwrap();
+        let t = local_time_on(day, "09:30").unwrap();
+        let local = Local.timestamp_millis_opt(t).single().unwrap();
+        assert_eq!(local.format("%H:%M").to_string(), "09:30");
+        assert_eq!(local.date_naive(), day);
+        assert_eq!(local_hm(t), "09:30");
+        assert_eq!(parse_end_on(day, "10:00", t).unwrap() - t, 30 * 60_000);
+        assert_eq!(parse_end_on(day, "+15m", t).unwrap() - t, 15 * 60_000);
+        assert!(local_time_on(day, "9:30").is_err());
+        assert!(parse_end_on(day, "25:00", t).is_err());
+    }
+
+    #[test]
+    fn snap_to_step_anchors_at_local_midnight() {
+        let (from, _) = today_window();
+        let step = 5 * 60_000;
+        let snapped = snap_to_step(from + 7 * 60_000 + 123_456, 5);
+        assert_eq!((snapped - from) % step, 0);
+        assert!(snapped - from >= 5 * 60_000 && snapped - from <= 10 * 60_000);
+        assert_eq!(snap_to_step(from, 5), from);
     }
 }

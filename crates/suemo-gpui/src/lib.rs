@@ -6,7 +6,9 @@
 //! over the daemon socket (decisions.md Q3); the engine daemon is separate
 //! and stays up when the overlay hides.
 
-mod day_view;
+mod editor;
+mod schedule;
+mod theme;
 
 use std::io::{BufRead, BufReader};
 use std::os::unix::fs::PermissionsExt;
@@ -26,7 +28,7 @@ use gpui::{
 use gpui_platform::application;
 use suemo::{config, ipc};
 
-use crate::day_view::{DayView, Quit};
+use crate::schedule::{Quit, ScheduleView};
 
 /// Single-overlay lock (decisions.md Q8): binding `gui.sock` fails while an
 /// overlay process is alive; a leftover file from a crash is probed and
@@ -110,12 +112,14 @@ pub fn run() -> Result<()> {
                 ..Default::default()
             },
             |window, cx| {
-                let entity = cx.new(DayView::new);
+                let entity = cx.new(ScheduleView::new);
                 window.focus(&entity.read(cx).focus_handle(cx), cx);
                 entity
             },
         )
-        .expect("opening the day view overlay");
+        .expect("opening the schedule overlay");
+        // Esc while the editor is open cancels the editor first (handled by
+        // the view's root on_action); a second Esc hides the overlay.
         cx.on_action(|_: &Quit, cx| cx.quit());
     });
     Ok(())

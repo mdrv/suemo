@@ -784,7 +784,7 @@ dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.12.1",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -3274,15 +3274,6 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
@@ -3911,6 +3902,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "mdrv-gpui-elements"
+version = "0.0.260925"
+source = "git+https://github.com/mdrv/gpui-ce?tag=mdrv-gpui-0.0.260925.5#66b109190b69152a0a7a03434be8631c1c3bbf64"
+dependencies = [
+ "mdrv-gpui-ce",
+ "palette",
+ "smallvec",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -5425,7 +5427,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -6542,6 +6544,7 @@ dependencies = [
  "futures",
  "log",
  "mdrv-gpui-ce",
+ "mdrv-gpui-elements",
  "mdrv-gpui-platform",
  "suemo",
 ]
