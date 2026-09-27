@@ -1,0 +1,17 @@
+[package]
+name = "suemo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Personal schedule and activity record: domain, engine, IPC, daemon, CLI"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+log.workspace = true
+mdrv-db = { version = "0.5.1", features = ["turso"] } # engine crate; TursoPort via the 0.5.1 export
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+ulid.workspace = true

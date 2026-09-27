@@ -1,0 +1,25 @@
+[package]
+name = "suemo-gpui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "GPUI front-end for suemo; hosts the `suemo` binary target"
+
+# The binary lives in this package: cargo forbids the cycle
+# suemo(bin) → suemo-gpui → suemo(lib), so the one crate that may see both
+# the core lib and gpui is this one.
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+env_logger.workspace = true
+# gpui-ce fork via git tag (MDRV.md §Registry); newest tag per PROMPT.
+gpui = { package = "mdrv-gpui-ce", git = "https://github.com/mdrv/gpui-ce", tag = "mdrv-gpui-0.0.260925.5" }
+gpui_platform = { package = "mdrv-gpui-platform", git = "https://github.com/mdrv/gpui-ce", tag = "mdrv-gpui-0.0.260925.5", features = [
+	"wayland",
+] }
+log.workspace = true
+suemo = { path = "../suemo" }
+
+[[bin]]
+name = "suemo"
+path = "src/main.rs"

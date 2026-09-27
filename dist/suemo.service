@@ -1,0 +1,11 @@
+# Developer-machine unit: repo checkout + release build. The packaged unit
+# (/usr/bin paths) arrives with M4 (proposal §Release & packaging).
+[Unit]
+Description=suemo — schedule + activity daemon
+
+[Service]
+ExecStart=/x/g/suemo/target/release/suemo daemon --foreground
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

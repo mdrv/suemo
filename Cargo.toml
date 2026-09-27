@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = ["crates/suemo", "crates/suemo-gpui"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[workspace.dependencies]
+anyhow = "1"
+# Local day/week boundaries are computed at render in the system timezone
+# (proposal §Data model); chrono's clock feature covers Local/Utc/NaiveDate.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+ulid = "1" # spec: event PKs are ULIDs (proposal §Data model)
+
+[patch.crates-io]
+arrayref = { git = "https://github.com/mdrv/gpui-ce" } # crates.io arrayref is yanked/broken (via tiny-skia)
