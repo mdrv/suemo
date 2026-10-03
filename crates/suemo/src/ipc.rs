@@ -22,7 +22,11 @@ pub use unix_transport::{
 #[cfg(not(unix))]
 mod unix_transport {
     //! Non-unix stubs: same names, runtime errors (compile-check only).
-    use anyhow::{Result, anyhow};
+    use std::path::PathBuf;
+
+    use anyhow::{anyhow, Result};
+
+    use super::{socket_path, Request, Response};
 
     pub fn connect() -> std::io::Result<std::fs::File> {
         Err(std::io::Error::new(
@@ -37,6 +41,9 @@ mod unix_transport {
         Err(anyhow!("suemo IPC requires a unix socket"))
     }
     pub fn write_request(_stream: &mut std::fs::File, _request: &Request) -> Result<()> {
+        Err(anyhow!("suemo IPC requires a unix socket"))
+    }
+    pub fn read_response(_stream: &mut std::fs::File) -> Result<Response> {
         Err(anyhow!("suemo IPC requires a unix socket"))
     }
     pub fn round_trip(_request: &Request) -> Result<Response> {
