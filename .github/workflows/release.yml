@@ -37,7 +37,7 @@ jobs:
     steps:
       - name: Install build dependencies (Wayland stack for the GPUI fork)
         run: |
-          pacman -Syu --noconfirm --needed git rustup wayland libxkbcommon fontconfig freetype
+          pacman -Syu --noconfirm --needed --disable-sandbox git rustup wayland libxkbcommon fontconfig freetype2
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
