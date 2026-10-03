@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow, ensure};
+use anyhow::{anyhow, ensure, Context, Result};
 
-use super::{Changed, Request, Response, socket_path};
+use super::{socket_path, Changed, Request, Response};
 
 pub fn connect() -> std::io::Result<UnixStream> {
     UnixStream::connect(socket_path())

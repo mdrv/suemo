@@ -27,9 +27,10 @@ use std::os::unix::net::UnixListener;
 use gpui::{
     App, AppContext, Bounds, Focusable as _, KeyBinding, WindowBackgroundAppearance, WindowBounds,
     WindowKind, WindowOptions,
-    layer_shell::{Anchor, KeyboardInteractivity, Layer, LayerShellOptions},
     point, px, size,
 };
+#[cfg(unix)]
+use gpui::layer_shell::{Anchor, KeyboardInteractivity, Layer, LayerShellOptions};
 use gpui_platform::application;
 use suemo::{config, ipc};
 
@@ -107,6 +108,22 @@ pub fn run() -> Result<()> {
             }
         })
         .detach();
+        // The overlay is a Wayland layer-shell surface (fork patch):
+        // top-level, all anchors, keyboard-exclusive. Windows is a
+        // compile-check target (proposal §Platforms) and the fork's
+        // layer-shell window kind is Wayland-only.
+        #[cfg(unix)]
+        let kind = WindowKind::LayerShell(LayerShellOptions {
+            namespace: "suemo".into(),
+            layer: Layer::Overlay,
+            anchor: Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT,
+            exclusive_zone: Some(px(-1.)),
+            exclusive_edge: None,
+            margin: None,
+            keyboard_interactivity: KeyboardInteractivity::Exclusive,
+        });
+        #[cfg(not(unix))]
+        let kind = WindowKind::Normal;
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds {
@@ -115,15 +132,7 @@ pub fn run() -> Result<()> {
                 })),
                 focus: true,
                 show: true,
-                kind: WindowKind::LayerShell(LayerShellOptions {
-                    namespace: "suemo".into(),
-                    layer: Layer::Overlay,
-                    anchor: Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT,
-                    exclusive_zone: Some(px(-1.)),
-                    exclusive_edge: None,
-                    margin: None,
-                    keyboard_interactivity: KeyboardInteractivity::Exclusive,
-                }),
+                kind,
                 window_background: WindowBackgroundAppearance::Transparent,
                 ..Default::default()
             },
